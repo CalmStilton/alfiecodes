@@ -100,7 +100,7 @@ h1{{margin:0;font-family:"Avenir Next","Segoe UI Variable Display","Segoe UI",sy
 <body>
 <main>
   <h1>Alfie</h1>
-  <p class="lede">Games and other things I’ve made with Python.</p>
+  <p class="lede">Games and other things I’ve made.</p>
 {body}
 </main>
 </body>
