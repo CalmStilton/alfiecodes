@@ -157,13 +157,102 @@ body{background:#12161F !important;color:#E8ECF2;font-family:"Avenir Next",Aveni
 GAME_PAGE_HOME = '<a id="alfie-home" href="../">Alfie</a>\n'
 
 
-def restyle_game_page(page, title, home_link=True):
-    """Make pygbag's generated index.html match Alfie's projects page."""
+# Touch controls: real HTML buttons beside the game, shown only on touch screens.
+# A press sends the same keydown/keyup a keyboard would, to the document, which
+# is where pygbag's SDL listens, so keyboard.left etc. just work.
+ARROWS = {
+    "up": ("ArrowUp", "ArrowUp", 38, "▲"),
+    "left": ("ArrowLeft", "ArrowLeft", 37, "◀"),
+    "right": ("ArrowRight", "ArrowRight", 39, "▶"),
+    "down": ("ArrowDown", "ArrowDown", 40, "▼"),
+}
+OTHER_KEYS = {
+    "space": (" ", "Space", 32, "Space"),
+    "return": ("Enter", "Enter", 13, "Enter"),
+    "enter": ("Enter", "Enter", 13, "Enter"),
+    "escape": ("Escape", "Escape", 27, "Esc"),
+    "tab": ("Tab", "Tab", 9, "Tab"),
+    "backspace": ("Backspace", "Backspace", 8, "⌫"),
+    "lshift": ("Shift", "ShiftLeft", 16, "Shift"),
+    "rshift": ("Shift", "ShiftRight", 16, "Shift"),
+    "lctrl": ("Control", "ControlLeft", 17, "Ctrl"),
+    "rctrl": ("Control", "ControlRight", 17, "Ctrl"),
+}
+for _c in "abcdefghijklmnopqrstuvwxyz":
+    OTHER_KEYS[_c] = (_c, f"Key{_c.upper()}", ord(_c.upper()), _c.upper())
+for _d in "0123456789":
+    OTHER_KEYS[f"k_{_d}"] = (_d, f"Digit{_d}", ord(_d), _d)
+
+
+def touch_keys(source):
+    """The keys a game reads through keyboard.<name>: (arrow names, other key names), in first-use order."""
+    arrows, others = [], []
+    for name in re.findall(r"\bkeyboard\.([A-Za-z_][A-Za-z0-9_]*)", source):
+        name = name.lower()
+        if name in ARROWS and name not in arrows:
+            arrows.append(name)
+        elif name in OTHER_KEYS and name not in others:
+            others.append(name)
+    return arrows, others
+
+
+def _touch_button(name, spec, cls):
+    key, code, key_code, label = spec
+    return (f'<button type="button" class="{cls}" data-key="{html.escape(key, quote=True)}" data-code="{code}" '
+            f'data-keycode="{key_code}" aria-label="{html.escape(name, quote=True)}">{html.escape(label)}</button>')
+
+
+def touch_controls(arrows, others):
+    """HTML, CSS and JS for the on-screen controls. Empty if the game reads no keys."""
+    if not arrows and not others:
+        return ""
+    pad = ""
+    if arrows:
+        cells = "".join(_touch_button(n, ARROWS[n], f"pad-{n}") for n in ("up", "left", "right", "down") if n in arrows)
+        pad = f'<div class="pad">{cells}</div>'
+    acts = "".join(_touch_button(n, OTHER_KEYS[n], "act") for n in others)
+    acts = f'<div class="acts">{acts}</div>' if acts else ""
+    return """<style id="alfie-touch-style">
+#alfie-touch{display:none}
+@media (pointer:coarse){#alfie-touch{display:flex}}
+#alfie-touch{position:fixed;left:0;right:0;bottom:0;z-index:1000000;justify-content:space-between;align-items:flex-end;padding:0 18px max(18px,env(safe-area-inset-bottom));pointer-events:none}
+#alfie-touch button{pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;border:1px solid rgba(232,236,242,.22);background:rgba(232,236,242,.14);color:#E8ECF2;font:700 18px/1 "Avenir Next",Avenir,"Segoe UI",system-ui,sans-serif;margin:0;padding:0}
+#alfie-touch button.down-now{background:#7C8CFF;color:#12161F;border-color:#7C8CFF}
+#alfie-touch .pad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(3,64px);gap:6px}
+#alfie-touch .pad button{border-radius:14px}
+#alfie-touch .pad-up{grid-area:1/2}#alfie-touch .pad-left{grid-area:2/1}#alfie-touch .pad-right{grid-area:2/3}#alfie-touch .pad-down{grid-area:3/2}
+#alfie-touch .acts{display:flex;gap:12px;margin-left:auto}
+#alfie-touch .act{min-width:76px;height:76px;padding:0 16px;border-radius:38px}
+</style>
+<div id="alfie-touch">""" + pad + acts + """</div>
+<script>
+(() => {
+  const send = (b, type) => {
+    const k = +b.dataset.keycode;
+    const e = new KeyboardEvent(type, {key: b.dataset.key, code: b.dataset.code, bubbles: true, cancelable: true});
+    Object.defineProperty(e, "keyCode", {get: () => k});
+    Object.defineProperty(e, "which", {get: () => k});
+    document.dispatchEvent(e);
+  };
+  document.querySelectorAll("#alfie-touch button").forEach(b => {
+    const press = ev => { if (b.classList.contains("down-now")) return; b.classList.add("down-now"); try { b.setPointerCapture(ev.pointerId); } catch (x) {} send(b, "keydown"); };
+    const release = () => { if (!b.classList.contains("down-now")) return; b.classList.remove("down-now"); send(b, "keyup"); };
+    b.addEventListener("pointerdown", press);
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach(t => b.addEventListener(t, release));
+    b.addEventListener("contextmenu", ev => ev.preventDefault());
+  });
+})();
+</script>
+"""
+
+
+def restyle_game_page(page, title, home_link=True, touch=""):
+    """Make pygbag's generated index.html match Alfie's projects page, and add touch controls."""
     text = page.read_text()
     text = text.replace("Ready to start ! Please click/touch page", "Click or tap to start")
     text = text.replace("Loading, please wait ...", "Loading. The first visit takes about 30 seconds.")
     text = re.sub(r"<title>.*?</title>", lambda m: f"<title>{html.escape(title)}</title>", text, count=1)
-    extra = GAME_PAGE_STYLE + (GAME_PAGE_HOME if home_link else "")
+    extra = GAME_PAGE_STYLE + (GAME_PAGE_HOME if home_link else "") + touch
     text = text.replace("</body>", extra + "</body>", 1) if "</body>" in text else text + extra
     page.write_text(text)
 
@@ -185,7 +274,8 @@ def build_web(name, projects, tmp, pygbag=(sys.executable, "-m", "pygbag"), home
         sys.stderr.write(result.stdout[-2000:] + result.stderr[-2000:])
         raise PublishError("The build didn't work. The messages above say why.")
     title = find_title(project / "game.py", name)
-    restyle_game_page(web / "index.html", title, home_link)
+    source = (project / "game.py").read_text(errors="replace")
+    restyle_game_page(web / "index.html", title, home_link, touch_controls(*touch_keys(source)))
     return web, title
 
 

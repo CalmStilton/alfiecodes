@@ -258,3 +258,28 @@ def test_preview_page_has_no_home_link(tmp_path):
     page.write_text(PYGBAG_PAGE)
     publish.restyle_game_page(page, "Pac Alfie", home_link=False)
     assert 'id="alfie-style"' in page.read_text() and '<a id="alfie-home"' not in page.read_text()
+
+
+def test_touch_keys_found_in_first_use_order():
+    src = "if keyboard.left: pass\nif keyboard.r or keyboard.RIGHT: pass\nif keyboard.left and keyboard.space: pass\nkeyboard.notakey\n"
+    assert publish.touch_keys(src) == (["left", "right"], ["r", "space"])
+    assert publish.touch_keys("print('no keys')") == ([], [])
+
+
+def test_touch_controls_buttons_match_the_keys():
+    out = publish.touch_controls(["left", "right", "up", "down"], ["r"])
+    assert out.count('class="pad-') == 4
+    assert 'data-code="KeyR" data-keycode="82" aria-label="r">R</button>' in out
+    assert "@media (pointer:coarse)" in out and "document.dispatchEvent" in out
+    only_arrows = publish.touch_controls(["left"], [])
+    assert 'class="acts"' not in only_arrows and 'class="pad-left"' in only_arrows
+    assert publish.touch_controls([], []) == ""
+
+
+def test_game_page_gets_touch_controls(tmp_path):
+    page = tmp_path / "index.html"
+    page.write_text(PYGBAG_PAGE)
+    publish.restyle_game_page(page, "Pac Alfie", touch=publish.touch_controls(["left"], ["space"]))
+    text = page.read_text()
+    assert text.index('id="alfie-touch"') < text.index("</body>")
+    assert 'data-code="Space"' in text
