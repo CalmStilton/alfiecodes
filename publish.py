@@ -121,14 +121,18 @@ def publish(name, projects, published, pygbag=(sys.executable, "-m", "pygbag")):
 
 
 def play(name, projects, port=8000):
-    """Build and serve a game for test-play. Nothing is published."""
+    """Build and serve a game for test-play. Nothing is published.
+
+    Served on its own port, not through code-server's /proxy/, because that path
+    needs the IDE login cookie and pygbag fetches the game file without one.
+    """
     with tempfile.TemporaryDirectory(prefix="play-") as tmp:
         web, title = build_web(name, projects, tmp)
-        domain = os.environ.get("PROXY_DOMAIN", "localhost")
-        print(f"\n'{title}' is ready to play. Open this address:\n\n  https://{domain}/proxy/{port}/\n")
+        url = os.environ.get("PLAY_URL", f"http://localhost:{port}/")
+        print(f"\n'{title}' is ready to play. Open this address:\n\n  {url}\n")
         print("(The first load is slow. Click the page to start. Press Ctrl+C here when you are done.)")
         try:
-            subprocess.run([sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1", "--directory", str(web)],
+            subprocess.run([sys.executable, "-m", "http.server", str(port), "--bind", "0.0.0.0", "--directory", str(web)],
                            stderr=subprocess.DEVNULL)
         except KeyboardInterrupt:
             pass

@@ -6,7 +6,7 @@ Every game lives in its own folder. Inside the folder is a file called `game.py`
 
 1. Click on your `game.py` file so it is open.
 2. Press **F5**, or click **Play** at the very bottom of the screen.
-3. Wait a moment. A web address appears in the box at the bottom. Open it.
+3. Wait a moment. A web address appears in the box at the bottom. Click it, or copy it into a new tab.
 4. Click the page to start. Press **Ctrl+C** in the bottom box when you have finished.
 
 ## Share your game

@@ -14,6 +14,7 @@ services:
       TZ: Europe/London
       PASSWORD: ${PASSWORD}
       PROXY_DOMAIN: alfiecodes.lan.lukmor.com
+      PLAY_URL: https://alfieplay.lan.lukmor.com/
       DEFAULT_WORKSPACE: /config/workspace
     volumes:
       - ./config:/config
@@ -21,5 +22,6 @@ services:
       - ./published:/published
     ports:
       - "8080:8443"
+      - "8000:8000"   # test-play preview (publish-game --play), via Caddy as alfieplay.lan.lukmor.com
     mem_limit: 2g
     memswap_limit: 2g
