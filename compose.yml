@@ -1,0 +1,24 @@
+# Runs on the AlfieCodes LXC (192.168.50.200) in /docker/alfiecodes/.
+# Reached only through the LAN Caddy: https://alfiecodes.lan.lukmor.com
+# Secrets live in .env next to this file (never in git): PASSWORD=
+services:
+  code-server:
+    image: ghcr.io/calmstilton/alfiecodes:latest
+    container_name: alfiecodes
+    restart: unless-stopped
+    security_opt:
+      - apparmor=unconfined
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/London
+      PASSWORD: ${PASSWORD}
+      PROXY_DOMAIN: alfiecodes.lan.lukmor.com
+      DEFAULT_WORKSPACE: /config/workspace
+    volumes:
+      - ./config:/config
+      - ./projects:/config/workspace
+    ports:
+      - "8080:8443"
+    mem_limit: 2g
+    memswap_limit: 2g
