@@ -144,7 +144,31 @@ def take_snapshot(project, out_png, timeout=30):
     return result.returncode == 0 and Path(out_png).exists()
 
 
-def build_web(name, projects, tmp, pygbag=(sys.executable, "-m", "pygbag")):
+# Restyle pygbag's game page to match the projects page. The canvas itself is
+# left alone: pygbag warns that borders or padding on it break mouse positions.
+GAME_PAGE_STYLE = """<style id="alfie-style">
+body{background:#12161F !important;color:#E8ECF2;font-family:"Avenir Next",Avenir,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif}
+#infobox{background:rgba(232,236,242,.12) !important;color:#E8ECF2 !important;font:600 15px/1.3 "Avenir Next",Avenir,"Segoe UI",system-ui,sans-serif !important;padding:10px 22px !important;border-radius:999px}
+#status{color:#98A2B3 !important;font-family:inherit !important;font-weight:600 !important}
+#alfie-home{position:fixed;top:14px;left:16px;z-index:1000000;padding:6px 14px;border-radius:999px;background:rgba(232,236,242,.12);color:#E8ECF2;font:800 15px/1.2 "Avenir Next",Avenir,"Segoe UI",system-ui,sans-serif;letter-spacing:-.02em;text-decoration:none}
+#alfie-home:hover,#alfie-home:focus-visible{background:#7C8CFF;color:#12161F;outline:none}
+</style>
+"""
+GAME_PAGE_HOME = '<a id="alfie-home" href="../">Alfie</a>\n'
+
+
+def restyle_game_page(page, title, home_link=True):
+    """Make pygbag's generated index.html match Alfie's projects page."""
+    text = page.read_text()
+    text = text.replace("Ready to start ! Please click/touch page", "Click or tap to start")
+    text = text.replace("Loading, please wait ...", "Loading. The first visit takes about 30 seconds.")
+    text = re.sub(r"<title>.*?</title>", lambda m: f"<title>{html.escape(title)}</title>", text, count=1)
+    extra = GAME_PAGE_STYLE + (GAME_PAGE_HOME if home_link else "")
+    text = text.replace("</body>", extra + "</body>", 1) if "</body>" in text else text + extra
+    page.write_text(text)
+
+
+def build_web(name, projects, tmp, pygbag=(sys.executable, "-m", "pygbag"), home_link=True):
     """Build projects/<name> into tmp and return (web_folder, title)."""
     if not NAME_OK.match(name):
         raise PublishError(f"'{name}' can't be a web address. Use letters, numbers, - or _ (no spaces).")
@@ -160,7 +184,9 @@ def build_web(name, projects, tmp, pygbag=(sys.executable, "-m", "pygbag")):
     if result.returncode != 0 or not (web / "index.html").exists():
         sys.stderr.write(result.stdout[-2000:] + result.stderr[-2000:])
         raise PublishError("The build didn't work. The messages above say why.")
-    return web, find_title(project / "game.py", name)
+    title = find_title(project / "game.py", name)
+    restyle_game_page(web / "index.html", title, home_link)
+    return web, title
 
 
 README_START = "<!-- projects:start -->"
@@ -269,7 +295,7 @@ def run(name, projects, port=8000):
     needs the IDE login cookie and pygbag fetches the game file without one.
     """
     with tempfile.TemporaryDirectory(prefix="run-") as tmp:
-        web, title = build_web(name, projects, tmp)
+        web, title = build_web(name, projects, tmp, home_link=False)
         url = os.environ.get("PREVIEW_URL", f"http://localhost:{port}/")
         print(f"\n'{title}' is running. Open this address:\n\n  {url}\n")
         print("(The first load is slow. Click the page to start. Press Ctrl+C here when you are done.)")

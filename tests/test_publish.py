@@ -231,3 +231,30 @@ def test_publish_commit_includes_the_readme(tmp_path):
     (work / "a" / "game.py").write_text("x = 3\n")
     publish.record_in_git(work, "a", "Game A")
     assert sorted(_git(work, "show", "--name-only", "--format=", "HEAD").split()) == ["README.md", "a/game.py"]
+
+
+PYGBAG_PAGE = """<html><script>
+    platform.document.body.style.background = "#7f7f7f"
+        msg  = "Ready to start ! Please click/touch page"
+</script><head><title>pac-alfie</title></head><body>
+<div id="infobox">Loading, please wait ...</div>
+</body></html>"""
+
+
+def test_game_page_restyle(tmp_path):
+    page = tmp_path / "index.html"
+    page.write_text(PYGBAG_PAGE)
+    publish.restyle_game_page(page, "Pac <Alfie>")
+    text = page.read_text()
+    assert "<title>Pac &lt;Alfie&gt;</title>" in text
+    assert '"Click or tap to start"' in text and "Ready to start" not in text
+    assert "The first visit takes about 30 seconds." in text
+    assert text.index('id="alfie-style"') < text.index("</body>")
+    assert '<a id="alfie-home" href="../">Alfie</a>' in text
+
+
+def test_preview_page_has_no_home_link(tmp_path):
+    page = tmp_path / "index.html"
+    page.write_text(PYGBAG_PAGE)
+    publish.restyle_game_page(page, "Pac Alfie", home_link=False)
+    assert 'id="alfie-style"' in page.read_text() and '<a id="alfie-home"' not in page.read_text()
