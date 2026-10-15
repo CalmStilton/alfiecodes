@@ -76,8 +76,8 @@ def test_missing_game_py_is_explained(tmp_path):
 def test_failed_build_publishes_nothing(tmp_path):
     projects, published = tmp_path / "p", tmp_path / "pub"
     (projects / "g").mkdir(parents=True)
-    (projects / "g" / "game.py").write_text("WIDTH = 10\n")
-    with pytest.raises(publish.PublishError):
+    (projects / "g" / "game.py").write_text("WIDTH = 10\ndef draw():\n    screen.fill('black')\n")
+    with pytest.raises(publish.PublishError, match="build didn't work"):
         publish.publish("g", projects, published, pygbag=("false",))
     assert not (published / "g").exists() and not (published / "index.html").exists()
 
@@ -85,7 +85,7 @@ def test_failed_build_publishes_nothing(tmp_path):
 def test_publish_replaces_an_existing_game_and_updates_index(tmp_path):
     projects, published = tmp_path / "p", tmp_path / "pub"
     (projects / "g").mkdir(parents=True)
-    (projects / "g" / "game.py").write_text('TITLE = "First"\n')
+    (projects / "g" / "game.py").write_text('TITLE = "First"\ndef draw():\n    screen.clear()\n')
     fake = tmp_path / "fakepygbag.py"
     fake.write_text(
         "import sys, pathlib\n"
@@ -95,7 +95,7 @@ def test_publish_replaces_an_existing_game_and_updates_index(tmp_path):
     )
     cmd = (sys.executable, str(fake))
     assert publish.publish("g", projects, published, cmd) == "First"
-    (projects / "g" / "game.py").write_text('TITLE = "Second"\n')
+    (projects / "g" / "game.py").write_text('TITLE = "Second"\ndef draw():\n    screen.clear()\n')
     assert publish.publish("g", projects, published, cmd) == "Second"
     assert "Second" in (published / "g" / "index.html").read_text()
     assert "Second" in (published / "index.html").read_text() and "First" not in (published / "index.html").read_text()
@@ -283,3 +283,64 @@ def test_game_page_gets_touch_controls(tmp_path):
     text = page.read_text()
     assert text.index('id="alfie-touch"') < text.index("</body>")
     assert 'data-code="Space"' in text
+
+
+def test_project_kind_from_files(tmp_path):
+    def folder(name, **files):
+        f = tmp_path / name
+        f.mkdir()
+        for fname, text in files.items():
+            (f / fname.replace("_", ".")).write_text(text)
+        return f
+    assert publish.project_kind(folder("g", game_py="import pgzrun\ndef draw():\n    pass\n")) == "game"
+    assert publish.project_kind(folder("q", game_py="name = input('Name? ')\nprint('Hi', name)\n")) == "python"
+    assert publish.project_kind(folder("w", index_html="<h1>Hi</h1>")) == "website"
+    assert publish.project_kind(folder("s", notes_txt="ideas")) is None
+
+
+def test_website_title_and_description(tmp_path):
+    (tmp_path / "w").mkdir()
+    (tmp_path / "w" / "index.html").write_text(
+        '<html><head><title>  My &amp; Site </title><meta name="description" content="All about my dog"></head></html>')
+    assert publish.project_title(tmp_path / "w") == "My & Site"
+    assert publish.describe(tmp_path / "w") == "All about my dog"
+    (tmp_path / "x").mkdir()
+    (tmp_path / "x" / "index.html").write_text("<p>no title</p>")
+    assert publish.project_title(tmp_path / "x") == "x"
+
+
+def test_website_publishes_as_is_without_a_build(tmp_path):
+    projects, published = tmp_path / "p", tmp_path / "pub"
+    site = projects / "dog-site"
+    (site / "pics").mkdir(parents=True)
+    (site / "index.html").write_text("<title>My Dog</title><p>Woof</p>")
+    (site / "style.css").write_text("p{color:red}")
+    (site / "pics" / "dog.txt").write_text("pretend picture")
+    (site / ".secret").write_text("hidden")
+    title = publish.publish("dog-site", projects, published, pygbag=("false",))   # pygbag never runs
+    assert title == "My Dog"
+    out = published / "dog-site"
+    assert sorted(p.name for p in out.iterdir()) == ["index.html", "pics", "project.json", "style.css"]
+    assert (out / "index.html").read_text() == "<title>My Dog</title><p>Woof</p>"   # not restyled
+    assert "thumb" not in json.loads((out / "project.json").read_text())
+    assert "My Dog" in (published / "index.html").read_text()
+
+
+def test_text_program_in_game_py_is_explained_not_built(tmp_path):
+    (tmp_path / "quiz").mkdir()
+    (tmp_path / "quiz" / "game.py").write_text("answer = input('2+2? ')\n")
+    with pytest.raises(publish.PublishError, match="print\\(\\) and input\\(\\)"):
+        publish.build_web("quiz", tmp_path, tmp_path / "out")
+
+
+def test_unknown_project_is_explained(tmp_path):
+    (tmp_path / "flask-app").mkdir()
+    (tmp_path / "flask-app" / "app.py").write_text("from flask import Flask\n")
+    with pytest.raises(publish.PublishError, match="index.html"):
+        publish.build_web("flask-app", tmp_path, tmp_path / "out")
+
+
+def test_readme_table_names_websites_by_their_title(tmp_path):
+    (tmp_path / "dog-site").mkdir()
+    (tmp_path / "dog-site" / "index.html").write_text('<title>My Dog</title><meta name="description" content="Woof">')
+    assert "| [My Dog](dog-site/) | Woof |" in publish.project_table(tmp_path)

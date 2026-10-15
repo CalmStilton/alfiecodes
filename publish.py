@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""publish <name>: build projects/<name>/game.py for the browser and add it to
+"""publish <name>: build projects/<name> for the browser (a Pygame Zero game.py, or a
+website with an index.html) and add it to
 Alfie's projects page (published/<name>/ plus published/index.html).
 publish --run <name>: build it and serve it for a try-out, publishing nothing.
 publish --readme: refresh the project table in the workspace README.
@@ -27,6 +28,7 @@ import pgzlite
 asyncio.run(pgzlite.run_file("game.py"))
 '''
 SKIP = shutil.ignore_patterns("__pycache__", ".git", "build", "*.apk", "main.py", "pgzlite.py")
+WEB_SKIP = shutil.ignore_patterns(".*", "__pycache__", "build", "node_modules")
 
 
 class PublishError(Exception):
@@ -36,6 +38,33 @@ class PublishError(Exception):
 def find_title(game_py, fallback):
     match = re.search(r"""^TITLE\s*=\s*(["'])(.*?)\1""", game_py.read_text(errors="replace"), re.M) if game_py.exists() else None
     return match.group(2) if match and match.group(2).strip() else fallback
+
+
+def project_kind(folder):
+    """What sort of project a folder holds, from its files:
+    "game" (a Pygame Zero game.py), "website" (index.html), "python" (a game.py
+    that isn't a Pygame Zero game, e.g. a print()/input() program), or None."""
+    game = folder / "game.py"
+    if game.exists():
+        src = game.read_text(errors="replace")
+        if re.search(r"^\s*def\s+draw\s*\(|\bpgzrun\b|\bscreen\.", src, re.M):
+            return "game"
+        return "python"
+    if (folder / "index.html").exists():
+        return "website"
+    return None
+
+
+def project_title(folder):
+    """A game's TITLE, a website's <title>, or else the folder name."""
+    if (folder / "game.py").exists():
+        return find_title(folder / "game.py", folder.name)
+    index = folder / "index.html"
+    if index.exists():
+        match = re.search(r"<title[^>]*>(.*?)</title>", index.read_text(errors="replace"), re.I | re.S)
+        if match and match.group(1).strip():
+            return html.unescape(" ".join(match.group(1).split()))
+    return folder.name
 
 
 def _published_on(iso):
@@ -258,12 +287,26 @@ def restyle_game_page(page, title, home_link=True, touch=""):
 
 
 def build_web(name, projects, tmp, pygbag=(sys.executable, "-m", "pygbag"), home_link=True):
-    """Build projects/<name> into tmp and return (web_folder, title)."""
+    """Build projects/<name> into tmp and return (web_folder, title).
+
+    Games go through pgzlite and pygbag; websites are copied as they are."""
     if not NAME_OK.match(name):
         raise PublishError(f"'{name}' can't be a web address. Use letters, numbers, - or _ (no spaces).")
     project = projects / name
-    if not (project / "game.py").exists():
-        raise PublishError(f"I can't find {project / 'game.py'}. Each project lives in its own folder, and a game needs a file called game.py.")
+    if not project.is_dir():
+        raise PublishError(f"I can't find a project folder called '{name}'.")
+    kind = project_kind(project)
+    title = project_title(project)
+    if kind == "website":
+        web = Path(tmp) / name / "web"
+        shutil.copytree(project, web, ignore=WEB_SKIP)
+        return web, title
+    if kind == "python":
+        raise PublishError("game.py doesn't look like a Pygame Zero game: it has no draw() and doesn't use screen. "
+                           "Programs that use print() and input() can't go on the web yet. Ask Dad.")
+    if kind is None:
+        raise PublishError("I don't know how to put this project on the web yet. A game needs a file called game.py, "
+                           "and a website needs a file called index.html. For anything else, ask Dad.")
     app = Path(tmp) / name  # pygbag names the game after this folder
     shutil.copytree(project, app, ignore=SKIP)
     shutil.copy(HERE / "pgzlite.py", app / "pgzlite.py")
@@ -273,7 +316,6 @@ def build_web(name, projects, tmp, pygbag=(sys.executable, "-m", "pygbag"), home
     if result.returncode != 0 or not (web / "index.html").exists():
         sys.stderr.write(result.stdout[-2000:] + result.stderr[-2000:])
         raise PublishError("The build didn't work. The messages above say why.")
-    title = find_title(project / "game.py", name)
     source = (project / "game.py").read_text(errors="replace")
     restyle_game_page(web / "index.html", title, home_link, touch_controls(*touch_keys(source)))
     return web, title
@@ -286,13 +328,20 @@ NOT_PROJECTS = {"build", "__pycache__", "node_modules"}
 
 def describe(folder):
     """A project's one-line description: a first-line comment in game.py or main.py,
-    or the first line of the folder's README.md. Empty if there isn't one."""
+    a website's <meta name="description">, or the first line of the folder's README.md.
+    Empty if there isn't one."""
     for name in ("game.py", "main.py"):
         f = folder / name
         if f.exists():
             first = (f.read_text(errors="replace").splitlines() or [""])[0].strip()
             if first.startswith("#") and not first.startswith("#!") and "coding" not in first:
                 return first.lstrip("#").strip()
+    index = folder / "index.html"
+    if index.exists():
+        match = re.search(r"""<meta\s+name=["']description["']\s+content=["']([^"']*)["']""",
+                          index.read_text(errors="replace"), re.I)
+        if match and match.group(1).strip():
+            return html.unescape(match.group(1).strip())
     readme = folder / "README.md"
     if readme.exists():
         for line in readme.read_text(errors="replace").splitlines():
@@ -307,7 +356,7 @@ def project_table(projects):
     for folder in sorted(p for p in projects.iterdir()
                          if p.is_dir() and not p.name.startswith(".") and p.name not in NOT_PROJECTS
                          and any(p.iterdir())):
-        title = find_title(folder / "game.py", folder.name)
+        title = project_title(folder)
         cell = lambda text: text.replace("|", "\\|")
         rows.append((title.lower(), f"| [{cell(title)}]({folder.name}/) | {cell(describe(folder))} |"))
     lines = ["| Project | What it is |", "|---|---|"] + [r for _, r in sorted(rows)]
@@ -364,7 +413,7 @@ def publish(name, projects, published, pygbag=(sys.executable, "-m", "pygbag")):
         shutil.rmtree(staging, ignore_errors=True)
         shutil.copytree(web, staging)
         meta = {"title": title, "published": datetime.date.today().isoformat()}
-        if take_snapshot(projects / name, staging / "thumb.png"):
+        if project_kind(projects / name) == "game" and take_snapshot(projects / name, staging / "thumb.png"):
             meta["thumb"] = "thumb.png"
         (staging / "project.json").write_text(json.dumps(meta))
         target = published / name
@@ -388,7 +437,10 @@ def run(name, projects, port=8000):
         web, title = build_web(name, projects, tmp, home_link=False)
         url = os.environ.get("PREVIEW_URL", f"http://localhost:{port}/")
         print(f"\n'{title}' is running. Open this address:\n\n  {url}\n")
-        print("(The first load is slow. Click the page to start. Press Ctrl+C here when you are done.)")
+        if project_kind(projects / name) == "game":
+            print("(The first load is slow. Click the page to start. Press Ctrl+C here when you are done.)")
+        else:
+            print("(Press Ctrl+C here when you are done.)")
         try:
             subprocess.run([sys.executable, "-m", "http.server", str(port), "--bind", "0.0.0.0", "--directory", str(web)],
                            stderr=subprocess.DEVNULL)
