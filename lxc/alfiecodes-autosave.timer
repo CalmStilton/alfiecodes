@@ -1,0 +1,11 @@
+# On the AlfieCodes LXC: /etc/systemd/system/. Enable with:
+#   systemctl enable --now alfiecodes-autosave.timer
+[Unit]
+Description=Autosave Alfie's projects nightly at 7pm UK time
+
+[Timer]
+OnCalendar=*-*-* 19:00:00 Europe/London
+Persistent=true
+
+[Install]
+WantedBy=timers.target

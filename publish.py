@@ -162,6 +162,26 @@ def build_web(name, projects, tmp, pygbag=(sys.executable, "-m", "pygbag")):
     return web, find_title(project / "game.py", name)
 
 
+def record_in_git(projects, name, title, timeout=30):
+    """Commit "Published <title>" for this project if the workspace is a git repo, then push.
+
+    Only this project's folder goes in the commit (empty if unchanged, so the
+    history still marks the moment). Never fails the publish: the nightly
+    autosave pushes anything that didn't make it.
+    """
+    if not (projects / ".git").exists():
+        return False
+    def git(*args):
+        try:
+            return subprocess.run(["git", "-C", str(projects), *args], capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            return None
+    git("add", "-A", "--", name)
+    done = git("commit", "-q", "--allow-empty", "--only", "-m", f"Published {title}", "--", name)
+    git("push", "-q")
+    return bool(done and done.returncode == 0)
+
+
 def publish(name, projects, published, pygbag=(sys.executable, "-m", "pygbag")):
     with tempfile.TemporaryDirectory(prefix="publish-") as tmp:
         web, title = build_web(name, projects, tmp, pygbag)
@@ -217,6 +237,7 @@ def main(argv):
             run(args[0], projects)
             return 0
         title = publish(args[0], projects, published)
+        record_in_git(projects, args[0], title)
     except PublishError as err:
         print(f"\nCouldn't build it: {err}")
         return 1

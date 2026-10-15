@@ -1,0 +1,9 @@
+# On the AlfieCodes LXC: /etc/systemd/system/. Commits and pushes Alfie's workspace.
+[Unit]
+Description=Autosave Alfie's projects to GitHub
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker exec -u abc -e HOME=/config alfiecodes autosave

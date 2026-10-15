@@ -107,3 +107,63 @@ def test_publish_replaces_an_existing_game_and_updates_index(tmp_path):
 def test_cli_usage_names_the_new_command(capsys):
     assert publish.main(["publish"]) == 2
     assert "publish [--run]" in capsys.readouterr().out
+
+
+def _git(repo, *args):
+    import subprocess
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=True).stdout
+
+
+def _repo_with_remote(tmp_path):
+    remote, work = tmp_path / "remote.git", tmp_path / "work"
+    _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(remote))
+    work.mkdir()
+    _git(work, "init", "-q", "-b", "main")
+    _git(work, "config", "user.name", "Alfie")
+    _git(work, "config", "user.email", "alfie@example.com")
+    _git(work, "remote", "add", "origin", str(remote))
+    (work / "a").mkdir()
+    (work / "a" / "game.py").write_text("x = 1\n")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", "first")
+    _git(work, "push", "-q", "-u", "origin", "main")
+    return remote, work
+
+
+def test_publish_commit_holds_only_that_project_and_is_pushed(tmp_path):
+    remote, work = _repo_with_remote(tmp_path)
+    (work / "a" / "game.py").write_text("x = 2\n")
+    (work / "b").mkdir()
+    (work / "b" / "game.py").write_text("half finished\n")
+    assert publish.record_in_git(work, "a", "Game A")
+    assert _git(work, "log", "-1", "--format=%s").strip() == "Published Game A"
+    assert _git(work, "show", "--name-only", "--format=", "HEAD").split() == ["a/game.py"]
+    assert "b/" in _git(work, "status", "--short")                      # other work left alone
+    assert _git(remote, "log", "-1", "--format=%s", "main").strip() == "Published Game A"
+
+
+def test_publishing_unchanged_code_still_marks_the_moment(tmp_path):
+    _, work = _repo_with_remote(tmp_path)
+    assert publish.record_in_git(work, "a", "Game A")
+    assert _git(work, "log", "-1", "--format=%s").strip() == "Published Game A"
+
+
+def test_no_git_repo_means_no_git(tmp_path):
+    (tmp_path / "a").mkdir()
+    assert publish.record_in_git(tmp_path, "a", "Game A") is False
+
+
+def test_autosave_commits_everything_and_pushes(tmp_path):
+    import os, subprocess
+    remote, work = _repo_with_remote(tmp_path)
+    (work / "b").mkdir()
+    (work / "b" / "game.py").write_text("new\n")
+    out = subprocess.run([str(ROOT / "autosave.sh")], env=dict(os.environ, PROJECTS=str(work)),
+                         capture_output=True, text=True).stdout
+    assert "autosave: pushed" in out
+    assert _git(remote, "log", "-1", "--format=%s", "main").startswith("Autosave ")
+    assert _git(work, "status", "--short") == ""
+    out = subprocess.run([str(ROOT / "autosave.sh")], env=dict(os.environ, PROJECTS=str(work)),
+                         capture_output=True, text=True).stdout
+    assert _git(work, "log", "-1", "--format=%s").startswith("Autosave ") and "pushed" in out   # nothing new: no extra commit
+    assert len(_git(work, "log", "--format=%h").split()) == 2
