@@ -25,3 +25,18 @@ services:
       - "8000:8000"   # test-play preview (publish-game --play), via Caddy as alfieplay.lan.lukmor.com
     mem_limit: 2g
     memswap_limit: 2g
+
+  # Public side: only /published, read-only. The Cloudflare Tunnel hostname
+  # (alfie.lukmor.com) points at this port; the IDE is never behind the tunnel.
+  published:
+    image: nginx:alpine
+    container_name: alfiecodes-published
+    restart: unless-stopped
+    security_opt:
+      - apparmor=unconfined
+    volumes:
+      - ./published:/published:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8081:8081"
+    mem_limit: 64m
