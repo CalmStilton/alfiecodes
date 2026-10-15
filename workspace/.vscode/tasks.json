@@ -2,6 +2,14 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Help",
+      "type": "shell",
+      "command": "/app/code-server/lib/vscode/bin/remote-cli/code-server \"${workspaceFolder}/HELP.md\"",
+      "presentation": { "reveal": "never", "close": true },
+      "options": { "statusbar": { "label": "$(question) Help", "detail": "How to use Alfie Codes" } },
+      "problemMatcher": []
+    },
+    {
       "label": "Run my project",
       "type": "shell",
       "command": "publish --run \"${relativeFileDirname}\"",

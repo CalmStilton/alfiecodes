@@ -9,7 +9,7 @@ Built by CI to `ghcr.io/calmstilton/alfiecodes:latest`.
 - **`publish.py`** (`publish` in the image) builds `projects/<project>/game.py` for the
   browser. `--run` serves it for a try-out; without it, the project is added to `/published`
   and the projects index page.
-- **`workspace/.vscode/tasks.json`** gives the editor "Run my project" (F5) and "Publish my project" (F6).
+- **`workspace/`** is the starting workspace: `.vscode/tasks.json` gives the editor "Run my project" (F5), "Publish my project" (F6) and a Help button that opens `HELP.md`; `README.md` is the front page of the projects repo.
 - **`autosave.sh`** (`autosave` in the image) commits and pushes the workspace if it is a git repo; `lxc/` has the systemd timer that runs it nightly at 7pm UK time. Publishing also commits `Published <title>`.
 - **`compose.yml`** runs it. Put `PASSWORD=...` in a `.env` file beside it.
 
