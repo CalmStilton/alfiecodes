@@ -2,6 +2,7 @@
 """publish <name>: build projects/<name>/game.py for the browser and add it to
 Alfie's projects page (published/<name>/ plus published/index.html).
 publish --run <name>: build it and serve it for a try-out, publishing nothing.
+publish --readme: refresh the project table in the workspace README.
 
 Environment: PROJECTS (default /config/workspace), PUBLISHED (default /published).
 """
@@ -162,10 +163,68 @@ def build_web(name, projects, tmp, pygbag=(sys.executable, "-m", "pygbag")):
     return web, find_title(project / "game.py", name)
 
 
+README_START = "<!-- projects:start -->"
+README_END = "<!-- projects:end -->"
+NOT_PROJECTS = {"build", "__pycache__", "node_modules"}
+
+
+def describe(folder):
+    """A project's one-line description: a first-line comment in game.py or main.py,
+    or the first line of the folder's README.md. Empty if there isn't one."""
+    for name in ("game.py", "main.py"):
+        f = folder / name
+        if f.exists():
+            first = (f.read_text(errors="replace").splitlines() or [""])[0].strip()
+            if first.startswith("#") and not first.startswith("#!") and "coding" not in first:
+                return first.lstrip("#").strip()
+    readme = folder / "README.md"
+    if readme.exists():
+        for line in readme.read_text(errors="replace").splitlines():
+            if line.strip():
+                return line.strip().lstrip("#").strip()
+    return ""
+
+
+def project_table(projects, published):
+    """The Markdown table of every project folder, for the workspace README."""
+    rows = []
+    for folder in sorted(p for p in projects.iterdir()
+                         if p.is_dir() and not p.name.startswith(".") and p.name not in NOT_PROJECTS
+                         and any(p.iterdir())):
+        title = find_title(folder / "game.py", folder.name)
+        cell = lambda text: text.replace("|", "\\|")
+        play = (f"[Play](https://alfie.lukmor.com/{folder.name}/)"
+                if (published / folder.name / "project.json").exists() else "")
+        rows.append((title.lower(), f"| [{cell(title)}]({folder.name}/) | {cell(describe(folder))} | {play} |"))
+    lines = ["| Project | What it is | Play |", "|---|---|---|"] + [r for _, r in sorted(rows)]
+    return "\n".join(lines)
+
+
+def update_readme(projects, published):
+    """Rebuild the table between the README markers. Everything else in the README
+    is Alfie's and is left exactly as it is. Returns True if the file changed."""
+    readme = projects / "README.md"
+    if not readme.exists():
+        return False
+    text = readme.read_text()
+    block = (f"{README_START}\n<!-- This table updates itself when you publish and every evening. -->\n"
+             f"{project_table(projects, published)}\n{README_END}")
+    if README_START in text and README_END in text:
+        before, rest = text.split(README_START, 1)
+        after = rest.split(README_END, 1)[1]
+        new = before + block + after
+    else:
+        new = text.rstrip("\n") + "\n\n" + block + "\n"
+    if new == text:
+        return False
+    readme.write_text(new)
+    return True
+
+
 def record_in_git(projects, name, title, timeout=30):
     """Commit "Published <title>" for this project if the workspace is a git repo, then push.
 
-    Only this project's folder goes in the commit (empty if unchanged, so the
+    Only this project's folder and the README go in the commit (empty if unchanged, so the
     history still marks the moment). Never fails the publish: the nightly
     autosave pushes anything that didn't make it.
     """
@@ -176,8 +235,9 @@ def record_in_git(projects, name, title, timeout=30):
             return subprocess.run(["git", "-C", str(projects), *args], capture_output=True, text=True, timeout=timeout)
         except subprocess.TimeoutExpired:
             return None
-    git("add", "-A", "--", name)
-    done = git("commit", "-q", "--allow-empty", "--only", "-m", f"Published {title}", "--", name)
+    paths = [name] + (["README.md"] if (projects / "README.md").exists() else [])
+    git("add", "-A", "--", *paths)
+    done = git("commit", "-q", "--allow-empty", "--only", "-m", f"Published {title}", "--", *paths)
     git("push", "-q")
     return bool(done and done.returncode == 0)
 
@@ -224,19 +284,23 @@ def run(name, projects, port=8000):
 
 def main(argv):
     args = argv[1:]
+    projects = Path(os.environ.get("PROJECTS", "/config/workspace"))
+    published = Path(os.environ.get("PUBLISHED", "/published"))
+    if args == ["--readme"]:
+        update_readme(projects, published)
+        return 0
     preview = args[:1] == ["--run"]
     if preview:
         args = args[1:]
     if len(args) != 1:
-        print("Usage: publish [--run] <project-folder-name>")
+        print("Usage: publish [--run] <project-folder-name>   (or: publish --readme)")
         return 2
-    projects = Path(os.environ.get("PROJECTS", "/config/workspace"))
-    published = Path(os.environ.get("PUBLISHED", "/published"))
     try:
         if preview:
             run(args[0], projects)
             return 0
         title = publish(args[0], projects, published)
+        update_readme(projects, published)
         record_in_git(projects, args[0], title)
     except PublishError as err:
         print(f"\nCouldn't build it: {err}")

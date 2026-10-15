@@ -167,3 +167,67 @@ def test_autosave_commits_everything_and_pushes(tmp_path):
                          capture_output=True, text=True).stdout
     assert _git(work, "log", "-1", "--format=%s").startswith("Autosave ") and "pushed" in out   # nothing new: no extra commit
     assert len(_git(work, "log", "--format=%h").split()) == 2
+
+
+def _workspace(tmp_path):
+    projects, published = tmp_path / "w", tmp_path / "pub"
+    (projects / "pac-alfie").mkdir(parents=True)
+    (projects / "pac-alfie" / "game.py").write_text('# My Pac-Man game\nimport pgzrun\nTITLE = "Pac Alfie"\n')
+    (projects / "website").mkdir()
+    (projects / "website" / "README.md").write_text("# My first web page\n\nMore words.\n")
+    (projects / "scratch").mkdir()
+    (projects / "scratch" / "game.py").write_text("#!/usr/bin/env python3\nprint('hi')\n")
+    (projects / "empty").mkdir()
+    (projects / ".vscode").mkdir()
+    (projects / ".vscode" / "tasks.json").write_text("{}")
+    (published / "pac-alfie").mkdir(parents=True)
+    (published / "pac-alfie" / "project.json").write_text("{}")
+    return projects, published
+
+
+def test_readme_table_lists_every_project_with_descriptions_and_play_links(tmp_path):
+    projects, published = _workspace(tmp_path)
+    table = publish.project_table(projects, published)
+    lines = table.splitlines()
+    assert lines[2] == "| [Pac Alfie](pac-alfie/) | My Pac-Man game | [Play](https://alfie.lukmor.com/pac-alfie/) |"
+    assert "| [scratch](scratch/) |  |  |" in lines          # shebang isn't a description; not published
+    assert "| [website](website/) | My first web page |  |" in lines
+    assert "empty" not in table and ".vscode" not in table
+
+
+def test_readme_update_keeps_alfies_words_and_is_idempotent(tmp_path):
+    projects, published = _workspace(tmp_path)
+    readme = projects / "README.md"
+    readme.write_text("# Alfie's projects\n\nMy words.\n\n<!-- projects:start -->\nold table\n<!-- projects:end -->\n\nMore of my words.\n")
+    assert publish.update_readme(projects, published) is True
+    text = readme.read_text()
+    assert text.startswith("# Alfie's projects\n\nMy words.\n\n<!-- projects:start -->")
+    assert text.endswith("<!-- projects:end -->\n\nMore of my words.\n")
+    assert "old table" not in text and "Pac Alfie" in text
+    assert publish.update_readme(projects, published) is False      # nothing changed the second time
+
+
+def test_readme_without_markers_gets_the_table_appended(tmp_path):
+    projects, published = _workspace(tmp_path)
+    (projects / "README.md").write_text("# Hi\n")
+    publish.update_readme(projects, published)
+    text = (projects / "README.md").read_text()
+    assert text.startswith("# Hi\n\n<!-- projects:start -->") and "Pac Alfie" in text
+
+
+def test_pipes_in_titles_dont_break_the_table(tmp_path):
+    projects, published = tmp_path / "w", tmp_path / "pub"
+    (projects / "x").mkdir(parents=True)
+    (projects / "x" / "game.py").write_text('# A | B\nTITLE = "Left | Right"\n')
+    published.mkdir()
+    assert "| [Left \\| Right](x/) | A \\| B |  |" in publish.project_table(projects, published)
+
+
+def test_publish_commit_includes_the_readme(tmp_path):
+    remote, work = _repo_with_remote(tmp_path)
+    (work / "README.md").write_text("# Mine\n")
+    _git(work, "add", "README.md"); _git(work, "commit", "-q", "-m", "readme")
+    (work / "README.md").write_text("# Mine\n\nnew table\n")
+    (work / "a" / "game.py").write_text("x = 3\n")
+    publish.record_in_git(work, "a", "Game A")
+    assert sorted(_git(work, "show", "--name-only", "--format=", "HEAD").split()) == ["README.md", "a/game.py"]

@@ -3,6 +3,7 @@
 # timer on the LXC); safe to run any time. Pushes his own unpushed commits too.
 cd "${PROJECTS:-/config/workspace}" || exit 0
 [ -d .git ] || exit 0
+publish --readme 2>/dev/null || true   # refresh the project table in README.md
 git add -A
 git diff --cached --quiet || git commit -q -m "Autosave $(date +'%-d %B %Y')"
 if git push -q origin HEAD 2>/tmp/autosave-push.err; then
