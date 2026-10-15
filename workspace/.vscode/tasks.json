@@ -7,6 +7,7 @@
       "command": "publish-game --play \"${relativeFileDirname}\"",
       "group": "build",
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "options": { "statusbar": { "label": "$(play) Play (F5)", "color": "#7CFC9A", "detail": "Try your game in the browser" } },
       "problemMatcher": []
     },
     {
@@ -15,6 +16,7 @@
       "command": "publish-game \"${relativeFileDirname}\"",
       "group": "build",
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "options": { "statusbar": { "label": "$(rocket) Publish (F6)", "color": "#FFD23F", "detail": "Put your game on the arcade page" } },
       "problemMatcher": []
     }
   ]

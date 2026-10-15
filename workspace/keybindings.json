@@ -1,0 +1,4 @@
+[
+  { "key": "f5", "command": "workbench.action.tasks.runTask", "args": "Play my game" },
+  { "key": "f6", "command": "workbench.action.tasks.runTask", "args": "Publish my game" }
+]
