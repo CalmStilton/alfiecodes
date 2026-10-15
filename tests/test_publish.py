@@ -22,17 +22,17 @@ def test_index_lists_games_sorted_and_escapes_titles():
     page = publish.make_index([("zed", "Zed"), ("pac", 'Pac <b>"Man"</b>')])
     assert page.index('href="pac/"') < page.index('href="zed/"')
     assert "<b>" not in page and "&lt;b&gt;" in page
-    assert "Alfie's Arcade" in page
+    assert "Alfie's Projects" in page
 
 
 def test_empty_index_has_a_friendly_message():
-    assert "No games yet" in publish.make_index([])
+    assert "Nothing here yet" in publish.make_index([])
 
 
-def test_write_index_reads_arcade_json(tmp_path):
+def test_write_index_reads_project_json(tmp_path):
     (tmp_path / "pacman").mkdir()
-    (tmp_path / "pacman" / "arcade.json").write_text(json.dumps({"title": "Pac Alfie"}))
-    (tmp_path / "junk").mkdir()  # no arcade.json: not a published game
+    (tmp_path / "pacman" / "project.json").write_text(json.dumps({"title": "Pac Alfie"}))
+    (tmp_path / "junk").mkdir()  # no project.json: not a published project
     publish.write_index(tmp_path)
     page = (tmp_path / "index.html").read_text()
     assert "Pac Alfie" in page and "junk" not in page
@@ -77,3 +77,8 @@ def test_publish_replaces_an_existing_game_and_updates_index(tmp_path):
     assert "Second" in (published / "g" / "index.html").read_text()
     assert "Second" in (published / "index.html").read_text() and "First" not in (published / "index.html").read_text()
     assert sorted(p.name for p in published.iterdir()) == ["g", "index.html"]  # no staging leftovers
+
+
+def test_cli_usage_names_the_new_command(capsys):
+    assert publish.main(["publish"]) == 2
+    assert "publish [--run]" in capsys.readouterr().out

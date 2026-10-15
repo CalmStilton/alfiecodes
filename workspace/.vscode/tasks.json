@@ -2,21 +2,21 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Play my game",
+      "label": "Run my project",
       "type": "shell",
-      "command": "publish-game --play \"${relativeFileDirname}\"",
+      "command": "publish --run \"${relativeFileDirname}\"",
       "group": "build",
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
-      "options": { "statusbar": { "label": "$(play) Play (F5)", "color": "#7CFC9A", "detail": "Try your game in the browser" } },
+      "options": { "statusbar": { "label": "$(play) Run (F5)", "color": "#7CFC9A", "detail": "Try your project in the browser" } },
       "problemMatcher": []
     },
     {
-      "label": "Publish my game",
+      "label": "Publish my project",
       "type": "shell",
-      "command": "publish-game \"${relativeFileDirname}\"",
+      "command": "publish \"${relativeFileDirname}\"",
       "group": "build",
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
-      "options": { "statusbar": { "label": "$(rocket) Publish (F6)", "color": "#FFD23F", "detail": "Put your game on the arcade page" } },
+      "options": { "statusbar": { "label": "$(rocket) Publish (F6)", "color": "#FFD23F", "detail": "Put your project on alfie.lukmor.com" } },
       "problemMatcher": []
     }
   ]

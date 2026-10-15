@@ -7,10 +7,10 @@ RUN apt-get update \
  && pip install --no-cache-dir --break-system-packages pygame-ce pygbag numpy \
  && pip install --no-cache-dir --break-system-packages --no-deps pgzero
 
-# pgzlite + the publish tool. publish-game builds a game for the browser and adds it to /published.
+# pgzlite + the publish tool. `publish` builds a project for the browser and adds it to /published.
 COPY pgzlite.py publish.py /opt/alfiecodes/
 RUN chmod 0755 /opt/alfiecodes/publish.py \
- && ln -s /opt/alfiecodes/publish.py /usr/local/bin/publish-game \
+ && ln -s /opt/alfiecodes/publish.py /usr/local/bin/publish \
  && mkdir -p /published && chown 1000:1000 /published
 
 LABEL org.opencontainers.image.source="https://github.com/CalmStilton/alfiecodes"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""publish-game <name>: build a game from projects/<name>/game.py for the browser
-and add it to the arcade (published/<name>/ plus published/index.html).
-publish-game --play <name>: build it and serve it for test-play, publishing nothing.
+"""publish <name>: build projects/<name>/game.py for the browser and add it to
+Alfie's projects page (published/<name>/ plus published/index.html).
+publish --run <name>: build it and serve it for a try-out, publishing nothing.
 
 Environment: PROJECTS (default /config/workspace), PUBLISHED (default /published).
 """
@@ -37,17 +37,17 @@ def find_title(game_py, fallback):
 
 
 def make_index(entries):
-    """entries: list of (folder, title). Returns the arcade home page as HTML."""
+    """entries: list of (folder, title). Returns the projects home page as HTML."""
     cards = "\n".join(
-        f'    <a class="game" href="{html.escape(folder, quote=True)}/"><span>{html.escape(title)}</span></a>'
+        f'    <a class="project" href="{html.escape(folder, quote=True)}/"><span>{html.escape(title)}</span></a>'
         for folder, title in sorted(entries, key=lambda e: e[1].lower())
-    ) or '    <p class="empty">No games yet. Publish one from the editor!</p>'
+    ) or '    <p class="empty">Nothing here yet. Publish a project from the editor!</p>'
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Alfie's Arcade</title>
+<title>Alfie's Projects</title>
 <style>
 :root{{color-scheme:dark}}
 *{{box-sizing:border-box}}
@@ -55,17 +55,17 @@ body{{margin:0;min-height:100vh;background:#12082b;color:#fff;font:600 1.1rem/1.
 main{{max-width:60rem;margin:0 auto;padding:clamp(1.5rem,5vw,4rem) 1.25rem}}
 h1{{font-size:clamp(2rem,7vw,3.6rem);margin:0 0 .25rem;color:#ffd23f;text-shadow:0 .08em 0 #ff3d81}}
 p.sub{{margin:0 0 2.5rem;color:#b9a8ff}}
-.games{{display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr))}}
-.game{{display:flex;align-items:center;justify-content:center;min-height:7rem;padding:1rem;text-align:center;text-decoration:none;color:#fff;background:#2b1565;border:3px solid #7c4dff;border-radius:1rem;font-size:1.3rem}}
-.game:hover,.game:focus-visible{{background:#ff3d81;border-color:#ffd23f;outline:none}}
+.projects{{display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr))}}
+.project{{display:flex;align-items:center;justify-content:center;min-height:7rem;padding:1rem;text-align:center;text-decoration:none;color:#fff;background:#2b1565;border:3px solid #7c4dff;border-radius:1rem;font-size:1.3rem}}
+.project:hover,.project:focus-visible{{background:#ff3d81;border-color:#ffd23f;outline:none}}
 .empty{{color:#b9a8ff}}
 </style>
 </head>
 <body>
 <main>
-  <h1>Alfie's Arcade</h1>
-  <p class="sub">Pick a game and press play.</p>
-  <div class="games">
+  <h1>Alfie's Projects</h1>
+  <p class="sub">Things I made. Pick one to try it.</p>
+  <div class="projects">
 {cards}
   </div>
 </main>
@@ -76,7 +76,7 @@ p.sub{{margin:0 0 2.5rem;color:#b9a8ff}}
 
 def write_index(published):
     entries = []
-    for meta in sorted(published.glob("*/arcade.json")):
+    for meta in sorted(published.glob("*/project.json")):
         title = json.loads(meta.read_text()).get("title") or meta.parent.name
         entries.append((meta.parent.name, title))
     (published / "index.html").write_text(make_index(entries))
@@ -88,7 +88,7 @@ def build_web(name, projects, tmp, pygbag=(sys.executable, "-m", "pygbag")):
         raise PublishError(f"'{name}' can't be a web address. Use letters, numbers, - or _ (no spaces).")
     project = projects / name
     if not (project / "game.py").exists():
-        raise PublishError(f"I can't find {project / 'game.py'}. Each game lives in its own folder with a file called game.py.")
+        raise PublishError(f"I can't find {project / 'game.py'}. Each project lives in its own folder, and a game needs a file called game.py.")
     app = Path(tmp) / name  # pygbag names the game after this folder
     shutil.copytree(project, app, ignore=SKIP)
     shutil.copy(HERE / "pgzlite.py", app / "pgzlite.py")
@@ -108,7 +108,7 @@ def publish(name, projects, published, pygbag=(sys.executable, "-m", "pygbag")):
         staging = published / f".{name}.new"
         shutil.rmtree(staging, ignore_errors=True)
         shutil.copytree(web, staging)
-        (staging / "arcade.json").write_text(json.dumps({"title": title}))
+        (staging / "project.json").write_text(json.dumps({"title": title}))
         target = published / name
         old = published / f".{name}.old"
         shutil.rmtree(old, ignore_errors=True)
@@ -120,16 +120,16 @@ def publish(name, projects, published, pygbag=(sys.executable, "-m", "pygbag")):
     return title
 
 
-def play(name, projects, port=8000):
-    """Build and serve a game for test-play. Nothing is published.
+def run(name, projects, port=8000):
+    """Build and serve a project for a try-out. Nothing is published.
 
     Served on its own port, not through code-server's /proxy/, because that path
     needs the IDE login cookie and pygbag fetches the game file without one.
     """
-    with tempfile.TemporaryDirectory(prefix="play-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="run-") as tmp:
         web, title = build_web(name, projects, tmp)
-        url = os.environ.get("PLAY_URL", f"http://localhost:{port}/")
-        print(f"\n'{title}' is ready to play. Open this address:\n\n  {url}\n")
+        url = os.environ.get("PREVIEW_URL", f"http://localhost:{port}/")
+        print(f"\n'{title}' is running. Open this address:\n\n  {url}\n")
         print("(The first load is slow. Click the page to start. Press Ctrl+C here when you are done.)")
         try:
             subprocess.run([sys.executable, "-m", "http.server", str(port), "--bind", "0.0.0.0", "--directory", str(web)],
@@ -140,23 +140,23 @@ def play(name, projects, port=8000):
 
 def main(argv):
     args = argv[1:]
-    preview = args[:1] == ["--play"]
+    preview = args[:1] == ["--run"]
     if preview:
         args = args[1:]
     if len(args) != 1:
-        print("Usage: publish-game [--play] <game-folder-name>")
+        print("Usage: publish [--run] <project-folder-name>")
         return 2
     projects = Path(os.environ.get("PROJECTS", "/config/workspace"))
     published = Path(os.environ.get("PUBLISHED", "/published"))
     try:
         if preview:
-            play(args[0], projects)
+            run(args[0], projects)
             return 0
         title = publish(args[0], projects, published)
     except PublishError as err:
         print(f"\nCouldn't build it: {err}")
         return 1
-    print(f"\nPublished '{title}'. It is on the arcade page now.")
+    print(f"\nPublished '{title}'. It is on your projects page now.")
     return 0
 
 
