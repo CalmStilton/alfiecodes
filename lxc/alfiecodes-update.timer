@@ -1,0 +1,12 @@
+# On the AlfieCodes LXC: /etc/systemd/system/. Enable with:
+#   systemctl enable --now alfiecodes-update.timer
+# Mondays after CI's weekly rebuild (04:23 UTC), before anyone is coding.
+[Unit]
+Description=Update AlfieCodes images weekly
+
+[Timer]
+OnCalendar=Mon *-*-* 05:30:00 Europe/London
+Persistent=true
+
+[Install]
+WantedBy=timers.target

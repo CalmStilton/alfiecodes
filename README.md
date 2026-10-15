@@ -10,7 +10,7 @@ Built by CI to `ghcr.io/calmstilton/alfiecodes:latest`.
   browser. `--run` serves it for a try-out; without it, the project is added to `/published`
   and the projects index page.
 - **`workspace/`** is the starting workspace: `.vscode/tasks.json` gives the editor "Run my project" (F5), "Publish my project" (F6) and a Help button that opens `HELP.md`; `README.md` is the front page of the projects repo.
-- **`autosave.sh`** (`autosave` in the image) commits and pushes the workspace if it is a git repo; `lxc/` has the systemd timer that runs it nightly at 7pm UK time. Publishing also commits `Published <title>`.
+- **`autosave.sh`** (`autosave` in the image) commits and pushes the workspace if it is a git repo; `lxc/` has the systemd units for the LXC: the autosave timer (nightly, 7pm UK time) and an image update timer (Mondays 5:30am UK time, after CI's weekly rebuild). The LXC also runs Debian's `unattended-upgrades` (default origins: Debian and Debian-Security). Publishing also commits `Published <title>`.
 - **`compose.yml`** runs it. Put `PASSWORD=...` in a `.env` file beside it.
 
 Tests: `python -m venv .venv && .venv/bin/pip install pygame-ce numpy pytest pgzero && .venv/bin/python -m pytest tests`
