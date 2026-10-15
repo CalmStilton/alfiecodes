@@ -461,6 +461,9 @@ def main(argv):
     if len(args) != 1:
         print("Usage: publish [--run] <project-folder-name>   (or: publish --readme)")
         return 2
+    # The editor passes the open file's folder; a file in a subfolder (dog-site/pics)
+    # still belongs to the project at the top (dog-site).
+    args[0] = args[0].replace("\\", "/").strip("/").split("/")[0]
     try:
         if preview:
             run(args[0], projects)

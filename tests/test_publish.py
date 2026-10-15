@@ -344,3 +344,14 @@ def test_readme_table_names_websites_by_their_title(tmp_path):
     (tmp_path / "dog-site").mkdir()
     (tmp_path / "dog-site" / "index.html").write_text('<title>My Dog</title><meta name="description" content="Woof">')
     assert "| [My Dog](dog-site/) | Woof |" in publish.project_table(tmp_path)
+
+
+def test_a_file_in_a_subfolder_publishes_its_project(tmp_path, monkeypatch, capsys):
+    projects, published = tmp_path / "p", tmp_path / "pub"
+    (projects / "dog-site" / "pics").mkdir(parents=True)
+    (projects / "dog-site" / "index.html").write_text("<title>My Dog</title>")
+    monkeypatch.setenv("PROJECTS", str(projects))
+    monkeypatch.setenv("PUBLISHED", str(published))
+    assert publish.main(["publish", "dog-site/pics"]) == 0
+    assert (published / "dog-site" / "index.html").exists()
+    assert "Published 'My Dog'" in capsys.readouterr().out
