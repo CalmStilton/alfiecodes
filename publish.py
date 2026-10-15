@@ -185,7 +185,7 @@ def describe(folder):
     return ""
 
 
-def project_table(projects, published):
+def project_table(projects):
     """The Markdown table of every project folder, for the workspace README."""
     rows = []
     for folder in sorted(p for p in projects.iterdir()
@@ -193,14 +193,12 @@ def project_table(projects, published):
                          and any(p.iterdir())):
         title = find_title(folder / "game.py", folder.name)
         cell = lambda text: text.replace("|", "\\|")
-        play = (f"[Play](https://alfie.lukmor.com/{folder.name}/)"
-                if (published / folder.name / "project.json").exists() else "")
-        rows.append((title.lower(), f"| [{cell(title)}]({folder.name}/) | {cell(describe(folder))} | {play} |"))
-    lines = ["| Project | What it is | Play |", "|---|---|---|"] + [r for _, r in sorted(rows)]
+        rows.append((title.lower(), f"| [{cell(title)}]({folder.name}/) | {cell(describe(folder))} |"))
+    lines = ["| Project | What it is |", "|---|---|"] + [r for _, r in sorted(rows)]
     return "\n".join(lines)
 
 
-def update_readme(projects, published):
+def update_readme(projects):
     """Rebuild the table between the README markers. Everything else in the README
     is Alfie's and is left exactly as it is. Returns True if the file changed."""
     readme = projects / "README.md"
@@ -208,7 +206,7 @@ def update_readme(projects, published):
         return False
     text = readme.read_text()
     block = (f"{README_START}\n<!-- This table updates itself when you publish and every evening. -->\n"
-             f"{project_table(projects, published)}\n{README_END}")
+             f"{project_table(projects)}\n{README_END}")
     if README_START in text and README_END in text:
         before, rest = text.split(README_START, 1)
         after = rest.split(README_END, 1)[1]
@@ -287,7 +285,7 @@ def main(argv):
     projects = Path(os.environ.get("PROJECTS", "/config/workspace"))
     published = Path(os.environ.get("PUBLISHED", "/published"))
     if args == ["--readme"]:
-        update_readme(projects, published)
+        update_readme(projects)
         return 0
     preview = args[:1] == ["--run"]
     if preview:
@@ -300,7 +298,7 @@ def main(argv):
             run(args[0], projects)
             return 0
         title = publish(args[0], projects, published)
-        update_readme(projects, published)
+        update_readme(projects)
         record_in_git(projects, args[0], title)
     except PublishError as err:
         print(f"\nCouldn't build it: {err}")
