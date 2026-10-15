@@ -1,3 +1,5 @@
 .env
 config/
 projects/
+.venv/
+__pycache__/
