@@ -365,3 +365,10 @@ def test_refusals_point_alfie_to_daddy(tmp_path):
     for name in ("quiz", "odd"):
         with pytest.raises(publish.PublishError, match="sk Daddy"):
             publish.build_web(name, tmp_path, tmp_path / "out")
+
+
+def test_game_pages_cannot_be_text_selected():
+    # A long press beside the D-pad on Android selected the "Alfie" pill mid-game.
+    body_rule = next(r for r in publish.GAME_PAGE_STYLE.split("\n") if r.startswith("body{"))
+    assert "user-select:none" in body_rule and "-webkit-user-select:none" in body_rule
+    assert "-webkit-touch-callout:none" in body_rule

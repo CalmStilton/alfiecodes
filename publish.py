@@ -175,8 +175,11 @@ def take_snapshot(project, out_png, timeout=30):
 
 # Restyle pygbag's game page to match the projects page. The canvas itself is
 # left alone: pygbag warns that borders or padding on it break mouse positions.
+# Nothing on a game page is selectable: on Android a held thumb that slips off
+# the D-pad is a long press, which selected the "Alfie" pill's text (and opened
+# Google's tap-to-search panel) mid-game.
 GAME_PAGE_STYLE = """<style id="alfie-style">
-body{background:#12161F !important;color:#E8ECF2;font-family:"Avenir Next",Avenir,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif}
+body{background:#12161F !important;color:#E8ECF2;font-family:"Avenir Next",Avenir,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 #infobox{background:rgba(232,236,242,.12) !important;color:#E8ECF2 !important;font:600 15px/1.3 "Avenir Next",Avenir,"Segoe UI",system-ui,sans-serif !important;padding:10px 22px !important;border-radius:999px}
 #status{color:#98A2B3 !important;font-family:inherit !important;font-weight:600 !important}
 #alfie-home{position:fixed;top:14px;left:16px;z-index:1000000;padding:6px 14px;border-radius:999px;background:rgba(232,236,242,.12);color:#E8ECF2;font:800 15px/1.2 "Avenir Next",Avenir,"Segoe UI",system-ui,sans-serif;letter-spacing:-.02em;text-decoration:none}
