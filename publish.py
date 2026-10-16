@@ -303,10 +303,10 @@ def build_web(name, projects, tmp, pygbag=(sys.executable, "-m", "pygbag"), home
         return web, title
     if kind == "python":
         raise PublishError("game.py doesn't look like a Pygame Zero game: it has no draw() and doesn't use screen. "
-                           "Programs that use print() and input() can't go on the web yet. Ask Dad.")
+                           "Programs that use print() and input() can't go on the web yet. Ask Daddy.")
     if kind is None:
         raise PublishError("I don't know how to put this project on the web yet. A game needs a file called game.py, "
-                           "and a website needs a file called index.html. For anything else, ask Dad.")
+                           "and a website needs a file called index.html. For anything else, ask Daddy.")
     app = Path(tmp) / name  # pygbag names the game after this folder
     shutil.copytree(project, app, ignore=SKIP)
     shutil.copy(HERE / "pgzlite.py", app / "pgzlite.py")

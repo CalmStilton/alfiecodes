@@ -355,3 +355,13 @@ def test_a_file_in_a_subfolder_publishes_its_project(tmp_path, monkeypatch, caps
     assert publish.main(["publish", "dog-site/pics"]) == 0
     assert (published / "dog-site" / "index.html").exists()
     assert "Published 'My Dog'" in capsys.readouterr().out
+
+
+def test_refusals_point_alfie_to_daddy(tmp_path):
+    (tmp_path / "quiz").mkdir()
+    (tmp_path / "quiz" / "game.py").write_text("input()\n")
+    (tmp_path / "odd").mkdir()
+    (tmp_path / "odd" / "app.py").write_text("x = 1\n")
+    for name in ("quiz", "odd"):
+        with pytest.raises(publish.PublishError, match="sk Daddy"):
+            publish.build_web(name, tmp_path, tmp_path / "out")
